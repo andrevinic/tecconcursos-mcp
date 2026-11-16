@@ -17,8 +17,9 @@ TecConcursos em ferramentas para o Claude (ou qualquer cliente MCP). Com ele, vo
 O site tem export oficial em **Estatísticas**:
 
 1. **Estatísticas → Desempenho**: escolha o período, marque **Selecionar Todos** e clique em
-   **Exportar para planilha**. Essa planilha traz acertos e erros por matéria e assunto.
-2. (Opcional) **Estatísticas → Atividades** → *Exportar para planilha*. Só traz quantas questões você resolveu.
+   **Exportar para planilha**. Essa planilha traz acertos e erros por matéria e assunto. Ela **chega por
+   e-mail** em alguns minutos: salve o anexo `.xlsx` em `~/Downloads`.
+2. (Opcional) **Estatísticas → Atividades** → *Exportar para planilha*. Baixa na hora, mas só traz quantas questões você resolveu.
 3. Rode `tecconcursos-mcp importar`. O comando procura essas planilhas em `~/Downloads` pelo
    cabeçalho, copia para a pasta de exports como `desempenho_AAAA-MM-DD.xlsx` e pula as repetidas.
 
