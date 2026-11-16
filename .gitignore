@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+uv.lock
+
+# nunca versionar exports reais
+exports/
+*.export.*

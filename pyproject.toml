@@ -1,0 +1,36 @@
+[project]
+name = "tecconcursos-mcp"
+version = "0.1.0"
+description = "Servidor MCP (não oficial) que lê os arquivos exportados do TecConcursos e analisa seu desempenho."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Contribuidores do tecconcursos-mcp" }]
+keywords = ["mcp", "concursos", "tecconcursos", "claude", "estudos"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Natural Language :: Portuguese (Brazilian)",
+    "Topic :: Education",
+]
+dependencies = [
+    "mcp>=2.0,<3",
+    "openpyxl>=3.1",
+    "pdfplumber>=0.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "reportlab>=4"]
+
+[project.scripts]
+tecconcursos-mcp = "tecconcursos_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tecconcursos_mcp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
