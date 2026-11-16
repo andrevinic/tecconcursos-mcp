@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from typing import Any
@@ -9,7 +10,7 @@ from typing import Any
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 
-from . import __version__, analysis
+from . import __version__, analysis, mentoria
 from .parsers import Biblioteca, carregar_pasta
 
 PASTA_PADRAO = "~/TecConcursos/exports"
@@ -222,6 +223,51 @@ def progresso(materia: str | None = None) -> dict[str, Any]:
     if (aviso := _aviso_vazio(bib, "snapshots")):
         return aviso
     return analysis.progresso(bib.snapshots, materia)
+
+
+@mcp.tool(annotations=SOMENTE_LEITURA)
+def preparar_lancamentos_mentoria(metas: list[str]) -> dict[str, Any]:
+    """Calcula o que lançar nas Metas Diárias da mentoria a partir da planilha de Desempenho mais recente.
+
+    `metas`: títulos das metas de hoje ainda não concluídas, como aparecem na página
+    (ex.: ["Simulado de Informática", "Simulado de Direito Constitucional (VTM)"]).
+    Não acessa a mentoria: só devolve, por meta, a matéria do TecConcursos casada e as questões/acertos.
+    Mostre o resultado ao usuário e peça confirmação antes de preencher qualquer coisa.
+    """
+    bib = biblioteca()
+    if not bib.pasta.is_dir():
+        return {"erro": f"Pasta não encontrada: {bib.pasta}. Defina TEC_EXPORTS_DIR."}
+    return mentoria.preparar(bib.ultimo_snapshot("desempenho"), metas, bib.pasta)
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                      idempotentHint=False, openWorldHint=False))
+def registrar_lancamentos_mentoria(planilha: str, lancamentos: list[dict[str, Any]]) -> dict[str, Any]:
+    """Anota localmente (mentoria_lancados.json) o que JÁ foi salvo na mentoria, para não lançar de novo.
+
+    `planilha`: o campo `planilha` devolvido por `preparar_lancamentos_mentoria`.
+    `lancamentos`: itens efetivamente salvos, cada um com meta, materia_tec, questoes e acertos.
+    """
+    bib = biblioteca()
+    if planilha not in {s.arquivo for s in bib.snapshots}:
+        return {"erro": f"Planilha desconhecida: {planilha}"}
+    faltando = [i for i in lancamentos if not {"materia_tec", "questoes", "acertos"} <= set(i)]
+    if faltando:
+        return {"erro": "Cada lançamento precisa de materia_tec, questoes e acertos.", "itens": faltando}
+    return mentoria.registrar(bib.pasta, planilha, lancamentos)
+
+
+@mcp.prompt(name="lancar_metas_mentoria", title="Lançar desempenho do TEC nas metas da mentoria")
+def lancar_metas_mentoria() -> str:
+    """Roteiro: ler as metas de hoje, preparar, confirmar com o usuário, preencher e registrar."""
+    url = "a página de Metas Diárias da sua mentoria"
+    cfg = pasta_exports() / mentoria.ARQ_MAPA
+    if cfg.is_file():
+        try:
+            url = json.loads(cfg.read_text(encoding="utf-8")).get("url") or url
+        except ValueError:
+            pass
+    return mentoria.ROTEIRO.format(url=url)
 
 
 def main() -> None:

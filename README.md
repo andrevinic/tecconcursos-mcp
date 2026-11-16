@@ -37,6 +37,32 @@ tecconcursos-mcp painel --abrir  # gera <exports>/painel.html e abre no navegado
 O painel é um HTML único que funciona offline: taxa de acerto por matéria ao longo do tempo,
 questões por planilha, assuntos para revisar e a tabela completa. Tem tema claro e escuro.
 
+## Lançar nas Metas Diárias da mentoria (Tutory)
+
+Se sua mentoria usa a plataforma Tutory (página *Metas Diárias*), o Claude pode lançar ali as
+questões que você fez no TecConcursos. O servidor **não acessa a mentoria**: ele só calcula o que
+lançar, e quem preenche é o Claude no seu navegador (ex.: Claude in Chrome), **depois da sua confirmação**.
+
+1. No TecConcursos, exporte o **Desempenho** do período ainda não lançado (ex.: hoje) e rode `tecconcursos-mcp importar`.
+2. No Claude, use o prompt **`lancar_metas_mentoria`**. O roteiro é:
+   - ler as metas de hoje;
+   - `preparar_lancamentos_mentoria`, que casa cada meta com uma matéria do TEC ("Simulado de Língua Portuguesa (VTM)" → "Língua Portuguesa (Português)");
+   - mostrar a tabela e pedir sua confirmação;
+   - marcar "Meta concluída" e preencher *Questões feitas* / *Questões corretas*;
+   - `registrar_lancamentos_mentoria`.
+3. O que foi lançado fica em `mentoria_lancados.json`. A mesma planilha não é lançada duas vezes.
+
+Opcional, `mentoria.json` na pasta de exports:
+
+```json
+{
+  "url": "https://SUA-MENTORIA.tutory.com.br/painel/metas",
+  "materias": { "Simulado de Direito Penal (VTM)": "Direito Penal" }
+}
+```
+
+`materias` força pares meta → matéria do TEC quando o nome não bate sozinho.
+
 ## Ferramentas
 
 **Planilhas oficiais de Estatísticas** (resumos por matéria e assunto):
@@ -45,6 +71,8 @@ questões por planilha, assuntos para revisar e a tabela completa. Tem tema clar
 |---|---|
 | `desempenho_assuntos` | Acertos por matéria (`nivel=0`), assunto (`1`) ou subassunto (`2+`) na planilha mais recente; ordena por `fracos`, `fortes` ou `volume` |
 | `progresso` | Evolução da taxa de acerto e do volume, um ponto por planilha, no total e por matéria |
+| `preparar_lancamentos_mentoria` | Para cada meta do dia, a matéria do TEC e as questões/acertos a lançar |
+| `registrar_lancamentos_mentoria` | Anota localmente o que já foi lançado (única ferramenta que escreve, só na pasta de exports) |
 
 **Exports por questão** (CSV/JSON/PDF de caderno):
 
@@ -57,7 +85,7 @@ questões por planilha, assuntos para revisar e a tabela completa. Tem tema clar
 | `buscar_questao` | Busca por palavras no código, matéria, assunto, enunciado e alternativas |
 | `listar_exports` | Arquivos encontrados, quantas questões cada um rendeu e erros de leitura |
 
-Todas são somente leitura. Os filtros de texto ignoram acentos e maiúsculas, e aceitam trechos
+Todas são somente leitura, exceto `registrar_lancamentos_mentoria`, que grava só na pasta de exports. Os filtros de texto ignoram acentos e maiúsculas, e aceitam trechos
 (`materia="penal"` encontra "Direito Penal").
 
 ## Formatos aceitos
