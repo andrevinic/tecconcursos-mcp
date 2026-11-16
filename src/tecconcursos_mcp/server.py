@@ -12,6 +12,7 @@ from mcp.types import ToolAnnotations
 
 from . import __version__, analysis, mentoria
 from .parsers import Biblioteca, carregar_pasta
+from .parsers import qconcursos
 
 PASTA_PADRAO = "~/TecConcursos/exports"
 
@@ -101,6 +102,14 @@ def resumo_geral() -> dict[str, Any]:
         if snap.tem_acertos and resolvidas:
             estat["taxa_acerto"] = round(sum(m["acertos"] for m in mats) / resolvidas, 4)
         saida["estatisticas_tec"] = estat
+    dias_qc = sorted(s.data for s in bib.snapshots if s.fonte == qconcursos.FONTE)
+    if dias_qc:
+        mats = analysis.totais(bib.snapshots, nivel=0)
+        tot = sum(m["resolvidas"] for m in mats)
+        saida["qconcursos"] = {"dias_salvos": len(dias_qc), "de": dias_qc[0], "ate": dias_qc[-1],
+                               "resolvidas": tot,
+                               "taxa_acerto": round(sum(m["acertos"] for m in mats) / tot, 4) if tot else None,
+                               "materias": mats}
     if bib.questoes:
         saida["exports_por_questao"] = analysis.resumo_geral(bib.questoes)
     return saida
@@ -191,15 +200,28 @@ def desempenho_assuntos(
     min_questoes: int = 1,
     ordenar: str = "fracos",
     limite: int = 30,
+    fonte: str = "tec",
 ) -> dict[str, Any]:
-    """Acertos por matéria/assunto na planilha de Desempenho mais recente.
+    """Acertos por matéria/assunto.
 
-    nivel: 0 = matérias, 1 = assuntos de 1º nível (padrão), 2+ = subassuntos; None = todos.
+    fonte='tec': planilha de Desempenho mais recente do TecConcursos.
+      nivel: 0 = matérias, 1 = assuntos de 1º nível (padrão), 2+ = subassuntos; None = todos.
+    fonte='qconcursos': soma de todos os dias salvos; nivel 0 = disciplinas, 1 = assuntos.
     ordenar: 'fracos' (pior taxa primeiro, com Wilson para desempatar), 'fortes' ou 'volume'.
     """
     bib = biblioteca()
     if (aviso := _aviso_vazio(bib, "snapshots")):
         return aviso
+    if fonte == qconcursos.FONTE:
+        if ordenar not in analysis.ORDENS:
+            return {"erro": f"ordenar deve ser um de: {', '.join(analysis.ORDENS)}"}
+        linhas = [l for l in analysis.totais(bib.snapshots, nivel=1 if nivel is None else min(nivel, 1),
+                                             materia=materia)
+                  if l["resolvidas"] >= min_questoes]
+        if ordenar != "volume":
+            sinal = 1 if ordenar == "fracos" else -1
+            linhas.sort(key=lambda d: (sinal * d["taxa_acerto"], sinal * d["indice_confianca"], -d["resolvidas"]))
+        return {"fonte": fonte, "linhas": linhas[:limite]}
     snap = bib.ultimo_snapshot("desempenho") or bib.ultimo_snapshot("atividades")
     try:
         linhas = analysis.desempenho_assuntos(snap, materia, nivel, min_questoes, ordenar, limite)
@@ -213,16 +235,44 @@ def desempenho_assuntos(
 
 
 @mcp.tool(annotations=SOMENTE_LEITURA)
-def progresso(materia: str | None = None) -> dict[str, Any]:
-    """Evolução ao longo das planilhas exportadas: um ponto por planilha, no total e por matéria.
+def progresso(materia: str | None = None, fonte: str = "tec") -> dict[str, Any]:
+    """Evolução no tempo, no total e por matéria.
 
-    Cada planilha cobre o período escolhido no site na hora de exportar. Para comparar
-    pontos, exporte sempre com o mesmo tipo de período (ex.: últimos 7 dias, toda semana).
+    fonte='tec': um ponto por planilha exportada (cada uma cobre o período escolhido no site).
+    fonte='qconcursos': um ponto por dia coletado.
     """
     bib = biblioteca()
     if (aviso := _aviso_vazio(bib, "snapshots")):
         return aviso
-    return analysis.progresso(bib.snapshots, materia)
+    return analysis.progresso(bib.snapshots, materia, fonte)
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                                      idempotentHint=True, openWorldHint=False))
+def salvar_estatisticas_qconcursos(
+    data: str,
+    disciplinas: list[dict[str, Any]],
+    assuntos: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Grava as estatísticas de UM dia do QConcursos (qconcursos_AAAA-MM-DD.json na pasta de exports).
+
+    `data`: AAAA-MM-DD (a página foi filtrada com início = fim = esse dia).
+    `disciplinas`/`assuntos`: [{"nome": ..., "certas": int, "erradas": int}] lidos da tabela.
+    Salvar o mesmo dia de novo sobrescreve. Veja o prompt `coletar_qconcursos`.
+    """
+    try:
+        alvo = qconcursos.salvar(pasta_exports(), data, disciplinas, assuntos)
+    except (ValueError, KeyError, TypeError) as e:
+        return {"erro": str(e)}
+    tot = sum(int(d["certas"]) + int(d["erradas"]) for d in disciplinas)
+    return {"arquivo": str(alvo), "data": data, "questoes": tot,
+            "certas": sum(int(d["certas"]) for d in disciplinas)}
+
+
+@mcp.prompt(name="coletar_qconcursos", title="Coletar estatísticas do QConcursos")
+def coletar_qconcursos() -> str:
+    """Roteiro para ler, dia a dia, Minhas Estatísticas do QConcursos e salvar localmente."""
+    return qconcursos.ROTEIRO.format(script=qconcursos.SCRIPT_LEITURA)
 
 
 @mcp.tool(annotations=SOMENTE_LEITURA)

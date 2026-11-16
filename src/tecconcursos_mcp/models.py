@@ -95,6 +95,7 @@ class Snapshot:
     data: str  # ISO AAAA-MM-DD
     periodo_inicio: str | None = None
     linhas: list[LinhaEstatistica] = field(default_factory=list)
+    fonte: str = "tec"  # "tec" | "qconcursos"
 
     @property
     def tem_acertos(self) -> bool:

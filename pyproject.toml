@@ -1,6 +1,6 @@
 [project]
 name = "tecconcursos-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Servidor MCP (não oficial) que lê os arquivos exportados do TecConcursos e analisa seu desempenho."
 readme = "README.md"
 license = "MIT"

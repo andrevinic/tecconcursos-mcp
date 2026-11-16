@@ -38,6 +38,26 @@ tecconcursos-mcp painel --abrir  # gera <exports>/painel.html e abre no navegado
 O painel é um HTML único que funciona offline: taxa de acerto por matéria ao longo do tempo,
 questões por planilha, assuntos para revisar e a tabela completa. Tem tema claro e escuro.
 
+## QConcursos (sem export)
+
+O QConcursos não exporta, mas a página **Minhas Estatísticas** aceita qualquer período pela URL
+(`/usuario/estatisticas/disciplinas?gt=AAAA-MM-DD&lt=AAAA-MM-DD`). O prompt **`coletar_qconcursos`**
+orienta o Claude, no seu navegador já logado, a:
+
+- ler a tabela de **Disciplina** e de **Assunto** de cada dia ainda não salvo;
+- salvar cada dia com `salvar_estatisticas_qconcursos` em `qconcursos_AAAA-MM-DD.json`.
+
+Os dias nunca se sobrepõem, então somar dá o total exato. O roteiro proíbe clicar em **"zerar"**,
+que apaga as estatísticas no site.
+
+- `progresso(fonte="qconcursos")` mostra um ponto por dia.
+- `desempenho_assuntos(fonte="qconcursos")` soma todos os dias.
+- `resumo_geral` e o painel mostram o QConcursos em bloco separado do TecConcursos.
+
+Na página de Assuntos, uma questão pode contar em **vários assuntos** (o total por assunto passa do total
+de questões) e não aparece a disciplina de cada assunto. Use os assuntos para achar pontos fracos, não para
+somar volume.
+
 ## Lançar nas Metas Diárias da mentoria (Tutory)
 
 Se sua mentoria usa a plataforma Tutory (página *Metas Diárias*), o Claude pode lançar ali as
@@ -73,6 +93,7 @@ Opcional, `mentoria.json` na pasta de exports:
 | `desempenho_assuntos` | Acertos por matéria (`nivel=0`), assunto (`1`) ou subassunto (`2+`) na planilha mais recente; ordena por `fracos`, `fortes` ou `volume` |
 | `progresso` | Evolução da taxa de acerto e do volume, um ponto por planilha, no total e por matéria |
 | `preparar_lancamentos_mentoria` | Para cada meta do dia, a matéria do TEC e as questões/acertos a lançar |
+| `salvar_estatisticas_qconcursos` | Grava as estatísticas de um dia do QConcursos (lidas da página pelo Claude) |
 | `registrar_lancamentos_mentoria` | Anota localmente o que já foi lançado (única ferramenta que escreve, só na pasta de exports) |
 
 **Exports por questão** (CSV/JSON/PDF de caderno):
@@ -86,7 +107,7 @@ Opcional, `mentoria.json` na pasta de exports:
 | `buscar_questao` | Busca por palavras no código, matéria, assunto, enunciado e alternativas |
 | `listar_exports` | Arquivos encontrados, quantas questões cada um rendeu e erros de leitura |
 
-Todas são somente leitura, exceto `registrar_lancamentos_mentoria`, que grava só na pasta de exports. Os filtros de texto ignoram acentos e maiúsculas, e aceitam trechos
+Todas são somente leitura, exceto `salvar_estatisticas_qconcursos` e `registrar_lancamentos_mentoria`, que gravam só na pasta de exports. Os filtros de texto ignoram acentos e maiúsculas, e aceitam trechos
 (`materia="penal"` encontra "Direito Penal").
 
 ## Formatos aceitos

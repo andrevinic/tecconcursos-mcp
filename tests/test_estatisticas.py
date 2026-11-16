@@ -78,7 +78,7 @@ def test_planilha_oficial_nao_vira_questao(tmp_path: Path):
     desempenho(tmp_path / "desempenho_2026-11-10.xlsx")
     bib = carregar_pasta(tmp_path)
     assert bib.questoes == [] and len(bib.snapshots) == 1
-    assert bib.arquivos[0].snapshot == "desempenho"
+    assert bib.arquivos[0].snapshot == "tec:desempenho"
 
 
 def test_assuntos_fracos_e_progresso(tmp_path: Path):
@@ -114,7 +114,7 @@ def test_painel_html(tmp_path: Path):
     desempenho(tmp_path / "desempenho_2026-11-01.xlsx")
     desempenho(tmp_path / "desempenho_2026-11-08.xlsx", alfa=(10, 5))
     html = gerar_painel(carregar_pasta(tmp_path).snapshots)
-    assert "<title>Meu progresso TecConcursos</title>" in html
+    assert "<title>Meu progresso nos estudos</title>" in html
     assert "Matéria Alfa" in html and "Subtópico Um-A" in html and "<svg" in html
 
 

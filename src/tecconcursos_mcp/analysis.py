@@ -176,10 +176,10 @@ def _ponto(snap: Snapshot, linhas: list[LinhaEstatistica]) -> dict[str, Any]:
     return p
 
 
-def progresso(snapshots: list[Snapshot], materia: str | None = None) -> dict[str, Any]:
-    """Série temporal: um ponto por planilha exportada, no total e por matéria."""
+def progresso(snapshots: list[Snapshot], materia: str | None = None, fonte: str = "tec") -> dict[str, Any]:
+    """Série temporal: um ponto por snapshot (planilha do TEC ou dia do QConcursos), no total e por matéria."""
     alvo = normalizar(materia)
-    ordenados = sorted(snapshots, key=lambda s: (s.data, s.arquivo))
+    ordenados = sorted((s for s in snapshots if s.fonte == fonte), key=lambda s: (s.data, s.arquivo))
     geral, por_materia = [], defaultdict(list)
     for s in ordenados:
         mats = [l for l in s.materias() if not alvo or alvo in normalizar(l.materia)]
@@ -199,8 +199,33 @@ def progresso(snapshots: list[Snapshot], materia: str | None = None) -> dict[str
                 "diferenca_pontos": round((b["taxa_acerto"] - a["taxa_acerto"]) * 100, 1)}
 
     return {
+        "fonte": fonte,
         "snapshots": len(geral),
         "geral": geral,
         "variacao_geral": variacao(geral),
         "materias": {m: {"pontos": p, "variacao": variacao(p)} for m, p in sorted(por_materia.items())},
     }
+
+
+def totais(snapshots: list[Snapshot], fonte: str = "qconcursos", nivel: int = 0,
+           materia: str | None = None) -> list[dict[str, Any]]:
+    """Soma snapshots que não se sobrepõem (um por dia, como os do QConcursos).
+
+    nivel=0 soma por disciplina; nivel=1 soma por assunto.
+    """
+    alvo = normalizar(materia)
+    soma: dict[tuple[str, str], list[int]] = defaultdict(lambda: [0, 0])
+    for s in snapshots:
+        if s.fonte != fonte:
+            continue
+        for l in s.linhas:
+            if l.nivel == nivel and l.acertos is not None and (not alvo or alvo in normalizar(l.materia if nivel == 0 else l.nome)):
+                soma[(l.materia, l.nome)][0] += l.resolvidas
+                soma[(l.materia, l.nome)][1] += l.acertos
+    linhas = []
+    for (mat, nome), (tot, ac) in soma.items():
+        d = {"materia" if nivel == 0 else "assunto": nome if nivel else mat, "resolvidas": tot,
+             "acertos": ac, "erros": tot - ac, "taxa_acerto": round(ac / tot, 4) if tot else None,
+             "indice_confianca": round(_wilson_inferior(ac, tot), 4)}
+        linhas.append(d)
+    return sorted(linhas, key=lambda d: -d["resolvidas"])

@@ -9,6 +9,7 @@ from typing import Callable
 from ..models import Questao, Snapshot
 from .estatisticas import eh_planilha_estatisticas, ler_snapshot_xlsx, primeira_linha_xlsx
 from .pdf import ler_pdf
+from .qconcursos import ler_qconcursos
 from .tabular import ler_csv, ler_json, ler_xlsx
 
 PARSERS: dict[str, Callable[[Path], list[Questao]]] = {
@@ -37,8 +38,9 @@ class Biblioteca:
     arquivos: list[ResultadoArquivo] = field(default_factory=list)
     snapshots: list[Snapshot] = field(default_factory=list)
 
-    def ultimo_snapshot(self, tipo: str | None = "desempenho") -> Snapshot | None:
-        candidatos = [s for s in self.snapshots if tipo is None or s.tipo == tipo]
+    def ultimo_snapshot(self, tipo: str | None = "desempenho", fonte: str = "tec") -> Snapshot | None:
+        candidatos = [s for s in self.snapshots
+                      if (tipo is None or s.tipo == tipo) and s.fonte == fonte]
         return max(candidatos, key=lambda s: (s.data, s.arquivo), default=None)
 
 
@@ -52,13 +54,16 @@ def carregar_pasta(pasta: Path) -> Biblioteca:
             continue
         res = ResultadoArquivo(arquivo=str(caminho.relative_to(pasta)), formato=caminho.suffix.lower()[1:])
         try:
+            snap = None
             if caminho.suffix.lower() == ".xlsx" and eh_planilha_estatisticas(primeira_linha_xlsx(caminho)):
                 snap = ler_snapshot_xlsx(caminho)
-                if snap is not None:
-                    res.snapshot, res.data = snap.tipo, snap.data
-                    bib.snapshots.append(snap)
-                    bib.arquivos.append(res)
-                    continue
+            elif caminho.suffix.lower() == ".json" and caminho.name.startswith("qconcursos_"):
+                snap = ler_qconcursos(caminho)
+            if snap is not None:
+                res.snapshot, res.data = f"{snap.fonte}:{snap.tipo}", snap.data
+                bib.snapshots.append(snap)
+                bib.arquivos.append(res)
+                continue
             qs = parser(caminho)
             res.questoes = len(qs)
             bib.questoes.extend(qs)
