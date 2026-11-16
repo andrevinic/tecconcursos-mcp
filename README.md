@@ -1,8 +1,8 @@
 # tecconcursos-mcp
 
 > ⚠️ **Projeto não oficial.** Não tem vínculo com o TecConcursos nem é endossado por ele.
-> O servidor **não acessa o site**, não pede login e não faz scraping: ele só lê os
-> arquivos que **você mesmo exportou** e que estão no seu computador.
+> O servidor **não acessa o site**, não pede login e não faz scraping: ele só lê as
+> planilhas que **você mesmo exportou** pelo botão oficial e que estão no seu computador.
 
 Servidor [MCP](https://modelcontextprotocol.io) que transforma seus exports do
 TecConcursos em ferramentas para o Claude (ou qualquer cliente MCP). Com ele, você pode perguntar coisas como:
@@ -12,11 +12,45 @@ TecConcursos em ferramentas para o Claude (ou qualquer cliente MCP). Com ele, vo
 - *"Monta uma revisão com as questões de Física que errei na banca Cebraspe."*
 - *"Acha as questões sobre cadeia de custódia nos meus cadernos."*
 
+## Como tirar os dados do TecConcursos
+
+O site tem export oficial em **Estatísticas**:
+
+1. **Estatísticas → Desempenho**: escolha o período, marque **Selecionar Todos** e clique em
+   **Exportar para planilha**. Essa planilha traz acertos e erros por matéria e assunto.
+2. (Opcional) **Estatísticas → Atividades** → *Exportar para planilha*. Só traz quantas questões você resolveu.
+3. Rode `tecconcursos-mcp importar`. O comando procura essas planilhas em `~/Downloads` pelo
+   cabeçalho, copia para a pasta de exports como `desempenho_AAAA-MM-DD.xlsx` e pula as repetidas.
+
+Cada planilha vira um **ponto na sua evolução**. Ela não diz o período que cobre: a data é a do
+download. Para os pontos serem comparáveis, exporte sempre com o **mesmo tipo de período** (ex.: toda
+domingo, "últimos 7 dias"). Se quiser registrar o período, renomeie para
+`desempenho_2026-11-01_a_2026-11-07.xlsx`.
+
+## Painel de progresso
+
+```bash
+tecconcursos-mcp importar        # traz os exports novos de ~/Downloads
+tecconcursos-mcp painel --abrir  # gera <exports>/painel.html e abre no navegador
+```
+
+O painel é um HTML único que funciona offline: taxa de acerto por matéria ao longo do tempo,
+questões por planilha, assuntos para revisar e a tabela completa. Tem tema claro e escuro.
+
 ## Ferramentas
+
+**Planilhas oficiais de Estatísticas** (resumos por matéria e assunto):
 
 | Ferramenta | O que faz |
 |---|---|
-| `resumo_geral` | Questões carregadas, respondidas, taxa de acerto e período |
+| `desempenho_assuntos` | Acertos por matéria (`nivel=0`), assunto (`1`) ou subassunto (`2+`) na planilha mais recente; ordena por `fracos`, `fortes` ou `volume` |
+| `progresso` | Evolução da taxa de acerto e do volume, um ponto por planilha, no total e por matéria |
+
+**Exports por questão** (CSV/JSON/PDF de caderno):
+
+| Ferramenta | O que faz |
+|---|---|
+| `resumo_geral` | Visão geral: última planilha de Estatísticas e/ou questões carregadas, taxa de acerto e período |
 | `desempenho` | Taxa de acerto agrupada por `materia`, `assunto`, `banca`, `orgao`, `cargo` ou `ano`, com filtros |
 | `pontos_fracos` | Grupos com pior desempenho, ignorando amostras pequenas (usa limite inferior de Wilson para desempatar) |
 | `questoes_erradas` | Questões erradas, mais recentes primeiro, com filtros por matéria, assunto, banca e ano |
@@ -32,8 +66,9 @@ Coloque os exports numa pasta, que pode ter subpastas. O servidor lê:
 
 | Formato | Situação |
 |---|---|
+| `.xlsx` oficial de Estatísticas | ✅ Desempenho e Atividades (detectado pelo cabeçalho `Hierarquia`/`Índice`) |
 | `.csv` / `.tsv` | ✅ Separador `,` `;` ou tab; UTF-8 ou Latin-1 |
-| `.xlsx` | ✅ Todas as abas; a primeira linha é o cabeçalho |
+| `.xlsx` (outros) | ✅ Todas as abas; a primeira linha é o cabeçalho |
 | `.json` | ✅ Lista de objetos ou `{"questoes": [...]}` |
 | `.pdf` (caderno) | 🧪 Experimental: usa heurísticas sobre o texto |
 

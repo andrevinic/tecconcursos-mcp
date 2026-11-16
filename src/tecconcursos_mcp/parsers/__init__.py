@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-from ..models import Questao
+from ..models import Questao, Snapshot
+from .estatisticas import eh_planilha_estatisticas, ler_snapshot_xlsx, primeira_linha_xlsx
 from .pdf import ler_pdf
 from .tabular import ler_csv, ler_json, ler_xlsx
 
@@ -25,6 +26,8 @@ class ResultadoArquivo:
     formato: str
     questoes: int = 0
     erro: str | None = None
+    snapshot: str | None = None  # "desempenho"/"atividades" quando é a planilha oficial
+    data: str | None = None
 
 
 @dataclass
@@ -32,6 +35,11 @@ class Biblioteca:
     pasta: Path
     questoes: list[Questao] = field(default_factory=list)
     arquivos: list[ResultadoArquivo] = field(default_factory=list)
+    snapshots: list[Snapshot] = field(default_factory=list)
+
+    def ultimo_snapshot(self, tipo: str | None = "desempenho") -> Snapshot | None:
+        candidatos = [s for s in self.snapshots if tipo is None or s.tipo == tipo]
+        return max(candidatos, key=lambda s: (s.data, s.arquivo), default=None)
 
 
 def carregar_pasta(pasta: Path) -> Biblioteca:
@@ -44,6 +52,13 @@ def carregar_pasta(pasta: Path) -> Biblioteca:
             continue
         res = ResultadoArquivo(arquivo=str(caminho.relative_to(pasta)), formato=caminho.suffix.lower()[1:])
         try:
+            if caminho.suffix.lower() == ".xlsx" and eh_planilha_estatisticas(primeira_linha_xlsx(caminho)):
+                snap = ler_snapshot_xlsx(caminho)
+                if snap is not None:
+                    res.snapshot, res.data = snap.tipo, snap.data
+                    bib.snapshots.append(snap)
+                    bib.arquivos.append(res)
+                    continue
             qs = parser(caminho)
             res.questoes = len(qs)
             bib.questoes.extend(qs)
@@ -51,6 +66,7 @@ def carregar_pasta(pasta: Path) -> Biblioteca:
             res.erro = f"{type(e).__name__}: {e}"
         bib.arquivos.append(res)
     bib.questoes = _deduplicar(bib.questoes)
+    bib.snapshots.sort(key=lambda s: (s.data, s.arquivo))
     return bib
 
 

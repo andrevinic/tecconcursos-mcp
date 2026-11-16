@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import csv
 import json
+import re
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Iterable
 
 from ..models import Questao, normalizar
 
 APELIDOS: dict[str, list[str]] = {
-    "id": ["id", "codigo", "cod", "codigo da questao", "id questao", "questao", "numero"],
+    "id": ["id", "codigo", "cod", "codigo da questao", "id questao", "questao"],
     "materia": ["materia", "disciplina", "materia/disciplina"],
     "assunto": ["assunto", "assuntos", "topico", "tema"],
     "banca": ["banca", "organizadora", "banca organizadora"],
@@ -53,6 +55,27 @@ def _ano(valor: Any) -> int | None:
         return None
 
 
+_DATA_BR = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})")
+_DATA_ISO = re.compile(r"^(\d{4})-(\d{2})-(\d{2})")
+
+
+def _data(valor: Any) -> str | None:
+    """Converte para ISO (AAAA-MM-DD), para ordenar certo. Aceita dd/mm/aaaa."""
+    if isinstance(valor, (datetime, date)):
+        return valor.strftime("%Y-%m-%d")
+    texto = str(valor).strip()
+    if (m := _DATA_BR.match(texto)):
+        d, mes, a = m.groups()
+    elif (m := _DATA_ISO.match(texto)):
+        a, mes, d = m.groups()
+    else:
+        return texto or None
+    try:
+        return date(int(a), int(mes), int(d)).isoformat()
+    except ValueError:
+        return texto
+
+
 def linha_para_questao(linha: dict[str, Any], arquivo: str) -> Questao | None:
     dados: dict[str, Any] = {}
     for coluna, valor in linha.items():
@@ -65,10 +88,12 @@ def linha_para_questao(linha: dict[str, Any], arquivo: str) -> Questao | None:
         dados["acertou"] = _bool(dados["acertou"])
     if "ano" in dados:
         dados["ano"] = _ano(dados["ano"])
+    if "data" in dados:
+        dados["data"] = _data(dados["data"])
     if "alternativas" in linha and isinstance(linha["alternativas"], list):
         dados["alternativas"] = [str(a) for a in linha["alternativas"]]
     for campo in ("id", "materia", "assunto", "banca", "orgao", "cargo",
-                  "enunciado", "gabarito", "resposta", "data"):
+                  "enunciado", "gabarito", "resposta"):
         if campo in dados and dados[campo] is not None:
             dados[campo] = str(dados[campo]).strip()
     return Questao(arquivo=arquivo, **dados)
@@ -99,6 +124,7 @@ def ler_xlsx(caminho: Path) -> list[Questao]:
     wb = load_workbook(caminho, read_only=True, data_only=True)
     questoes: list[Questao] = []
     for ws in wb.worksheets:
+        ws.reset_dimensions()  # alguns exports declaram dimensão errada no XML
         linhas = ws.iter_rows(values_only=True)
         cabecalho = next(linhas, None)
         if not cabecalho:

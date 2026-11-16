@@ -20,10 +20,12 @@ mcp = MCPServer(
     name="tecconcursos-mcp",
     version=__version__,
     instructions=(
-        "Lê arquivos exportados do TecConcursos (CSV, XLSX, JSON ou PDF de caderno) "
-        "numa pasta local e analisa o desempenho do estudante. Não acessa o site. "
-        "Comece por `resumo_geral` ou `listar_exports`. Filtros de texto aceitam "
-        "trechos sem acento (ex.: materia='penal')."
+        "Lê arquivos exportados do TecConcursos numa pasta local e analisa o desempenho "
+        "do estudante. Não acessa o site. Há dois tipos de dado: (1) planilhas oficiais de "
+        "Estatísticas (Desempenho/Atividades), resumos por matéria e assunto, uma por data; "
+        "use `desempenho_assuntos` e `progresso`; (2) exports por questão (CSV/JSON/PDF de "
+        "caderno); use `desempenho`, `pontos_fracos`, `questoes_erradas`, `buscar_questao`. "
+        "Comece por `resumo_geral`. Filtros de texto aceitam trechos sem acento (ex.: materia='penal')."
     ),
 )
 
@@ -50,11 +52,21 @@ def biblioteca() -> Biblioteca:
     return _cache["bib"]
 
 
-def _aviso_vazio(bib: Biblioteca) -> dict[str, Any] | None:
+def _aviso_vazio(bib: Biblioteca, precisa: str = "questoes") -> dict[str, Any] | None:
     if not bib.pasta.is_dir():
         return {"erro": f"Pasta não encontrada: {bib.pasta}. Defina TEC_EXPORTS_DIR."}
-    if not bib.questoes:
-        return {"erro": f"Nenhuma questão encontrada em {bib.pasta}.",
+    if precisa == "questoes" and not bib.questoes:
+        dica = (" Há planilhas de Estatísticas: use `desempenho_assuntos` e `progresso`."
+                if bib.snapshots else "")
+        return {"erro": f"Nenhum export por questão encontrado em {bib.pasta}.{dica}",
+                "arquivos": [vars(a) for a in bib.arquivos]}
+    if precisa == "snapshots" and not bib.snapshots:
+        return {"erro": (f"Nenhuma planilha de Estatísticas em {bib.pasta}. No site, vá em "
+                         "Estatísticas → Desempenho, marque 'Selecionar Todos' e clique em "
+                         "'Exportar para planilha'; depois rode `tecconcursos-mcp importar`."),
+                "arquivos": [vars(a) for a in bib.arquivos]}
+    if precisa == "qualquer" and not bib.questoes and not bib.snapshots:
+        return {"erro": f"Nenhum export encontrado em {bib.pasta}.",
                 "arquivos": [vars(a) for a in bib.arquivos]}
     return None
 
@@ -67,15 +79,30 @@ def listar_exports() -> dict[str, Any]:
         "pasta": str(bib.pasta),
         "pasta_existe": bib.pasta.is_dir(),
         "total_questoes": len(bib.questoes),
-        "arquivos": [vars(a) for a in bib.arquivos],
+        "planilhas_estatisticas": len(bib.snapshots),
+        "arquivos": [{k: v for k, v in vars(a).items() if v is not None} for a in bib.arquivos],
     }
 
 
 @mcp.tool(annotations=SOMENTE_LEITURA)
 def resumo_geral() -> dict[str, Any]:
-    """Visão geral: questões carregadas, respondidas, taxa de acerto e período."""
+    """Visão geral: última planilha de Estatísticas (por matéria) e/ou exports por questão."""
     bib = biblioteca()
-    return _aviso_vazio(bib) or analysis.resumo_geral(bib.questoes)
+    if (aviso := _aviso_vazio(bib, "qualquer")):
+        return aviso
+    saida: dict[str, Any] = {}
+    if (snap := bib.ultimo_snapshot("desempenho") or bib.ultimo_snapshot("atividades")):
+        mats = analysis.desempenho_assuntos(snap, nivel=0, ordenar="volume", limite=1000)
+        resolvidas = sum(m["resolvidas"] for m in mats)
+        estat: dict[str, Any] = {"arquivo": snap.arquivo, "tipo": snap.tipo, "data": snap.data,
+                                 "resolvidas": resolvidas, "materias": mats,
+                                 "planilhas_carregadas": len(bib.snapshots)}
+        if snap.tem_acertos and resolvidas:
+            estat["taxa_acerto"] = round(sum(m["acertos"] for m in mats) / resolvidas, 4)
+        saida["estatisticas_tec"] = estat
+    if bib.questoes:
+        saida["exports_por_questao"] = analysis.resumo_geral(bib.questoes)
+    return saida
 
 
 @mcp.tool(annotations=SOMENTE_LEITURA)
@@ -156,8 +183,51 @@ def buscar_questao(
     return {"total": len(qs), "questoes": [q.resumo(max_enunciado=1000) for q in qs]}
 
 
+@mcp.tool(annotations=SOMENTE_LEITURA)
+def desempenho_assuntos(
+    materia: str | None = None,
+    nivel: int | None = 1,
+    min_questoes: int = 1,
+    ordenar: str = "fracos",
+    limite: int = 30,
+) -> dict[str, Any]:
+    """Acertos por matéria/assunto na planilha de Desempenho mais recente.
+
+    nivel: 0 = matérias, 1 = assuntos de 1º nível (padrão), 2+ = subassuntos; None = todos.
+    ordenar: 'fracos' (pior taxa primeiro, com Wilson para desempatar), 'fortes' ou 'volume'.
+    """
+    bib = biblioteca()
+    if (aviso := _aviso_vazio(bib, "snapshots")):
+        return aviso
+    snap = bib.ultimo_snapshot("desempenho") or bib.ultimo_snapshot("atividades")
+    try:
+        linhas = analysis.desempenho_assuntos(snap, materia, nivel, min_questoes, ordenar, limite)
+    except ValueError as e:
+        return {"erro": str(e)}
+    saida: dict[str, Any] = {"arquivo": snap.arquivo, "data": snap.data, "tipo": snap.tipo,
+                             "linhas": linhas}
+    if not snap.tem_acertos:
+        saida["aviso"] = "Planilha de Atividades só tem contagem; exporte a de Desempenho para ver acertos."
+    return saida
+
+
+@mcp.tool(annotations=SOMENTE_LEITURA)
+def progresso(materia: str | None = None) -> dict[str, Any]:
+    """Evolução ao longo das planilhas exportadas: um ponto por planilha, no total e por matéria.
+
+    Cada planilha cobre o período escolhido no site na hora de exportar. Para comparar
+    pontos, exporte sempre com o mesmo tipo de período (ex.: últimos 7 dias, toda semana).
+    """
+    bib = biblioteca()
+    if (aviso := _aviso_vazio(bib, "snapshots")):
+        return aviso
+    return analysis.progresso(bib.snapshots, materia)
+
+
 def main() -> None:
-    mcp.run("stdio")
+    from .cli import main as cli_main
+
+    cli_main()
 
 
 if __name__ == "__main__":

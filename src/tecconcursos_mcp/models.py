@@ -40,6 +40,70 @@ class Questao:
         return {k: v for k, v in d.items() if v not in (None, [], "")}
 
 
+@dataclass
+class LinhaEstatistica:
+    """Uma linha da planilha oficial de Estatísticas (matéria ou assunto).
+
+    ``hierarquia`` é vazia para a linha da matéria e ``"01.02"`` para assuntos;
+    ``nivel`` é 0 para a matéria, 1 para ``"01"``, 2 para ``"01.02"`` etc.
+    ``acertos``/``erros`` ficam ``None`` no export de Atividades, que só tem contagem.
+    """
+
+    materia: str
+    nome: str
+    hierarquia: str = ""
+    caminho: list[str] = field(default_factory=list)
+    resolvidas: int = 0
+    acertos: int | None = None
+    erros: int | None = None
+    peso: float | None = None
+
+    @property
+    def nivel(self) -> int:
+        return len(self.hierarquia.split(".")) if self.hierarquia else 0
+
+    @property
+    def taxa_acerto(self) -> float | None:
+        if self.acertos is None or not self.resolvidas:
+            return None
+        return round(self.acertos / self.resolvidas, 4)
+
+    def resumo(self) -> dict[str, Any]:
+        d = {
+            "materia": self.materia,
+            "assunto": self.nome if self.nivel else None,
+            "hierarquia": self.hierarquia or None,
+            "caminho": " > ".join(self.caminho) if self.nivel > 1 else None,
+            "resolvidas": self.resolvidas,
+            "acertos": self.acertos,
+            "erros": self.erros,
+            "taxa_acerto": self.taxa_acerto,
+        }
+        return {k: v for k, v in d.items() if v is not None}
+
+
+@dataclass
+class Snapshot:
+    """Uma planilha exportada de Estatísticas → Desempenho ou → Atividades.
+
+    A planilha não diz o período que cobre: ``data`` vem do nome do arquivo
+    (``AAAA-MM-DD``) ou, na falta, da data de modificação do arquivo.
+    """
+
+    arquivo: str
+    tipo: str  # "desempenho" | "atividades"
+    data: str  # ISO AAAA-MM-DD
+    periodo_inicio: str | None = None
+    linhas: list[LinhaEstatistica] = field(default_factory=list)
+
+    @property
+    def tem_acertos(self) -> bool:
+        return self.tipo == "desempenho"
+
+    def materias(self) -> list[LinhaEstatistica]:
+        return [l for l in self.linhas if l.nivel == 0]
+
+
 def normalizar(texto: str | None) -> str:
     """Minúsculas, sem acentos e sem espaços extras — para comparar e buscar."""
     if not texto:

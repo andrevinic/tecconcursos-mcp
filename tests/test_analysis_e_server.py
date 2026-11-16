@@ -54,7 +54,7 @@ def _chamar(nome: str, args: dict | None = None) -> dict:
 
 def test_servidor_ponta_a_ponta(pasta_exports: Path, monkeypatch):
     monkeypatch.setenv("TEC_EXPORTS_DIR", str(pasta_exports))
-    assert _chamar("resumo_geral")["respondidas"] == 7
+    assert _chamar("resumo_geral")["exports_por_questao"]["respondidas"] == 7
     assert _chamar("listar_exports")["total_questoes"] == 7
     grupos = _chamar("desempenho", {"agrupar_por": "banca"})["grupos"]
     assert {g["banca"] for g in grupos} == {"Banca Alfa", "Banca Beta"}
