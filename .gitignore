@@ -10,3 +10,10 @@ uv.lock
 # nunca versionar exports reais
 exports/
 *.export.*
+
+# dados pessoais de estudo (exports, coletas, painel)
+*.xlsx
+qconcursos_*.json
+mentoria.json
+mentoria_lancados.json
+painel.html

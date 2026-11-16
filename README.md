@@ -1,11 +1,17 @@
 # tecconcursos-mcp
 
-> ⚠️ **Projeto não oficial.** Não tem vínculo com o TecConcursos nem é endossado por ele.
-> O servidor **não acessa o site**, não pede login e não faz scraping: ele só lê as
-> planilhas que **você mesmo exportou** pelo botão oficial e que estão no seu computador.
+> ⚠️ **Projeto pessoal, independente e não oficial.** Não tem vínculo com TecConcursos,
+> QConcursos, Tutory ou qualquer mentoria, nem é endossado por eles. Os nomes são marcas
+> dos respectivos donos e aparecem aqui só para dizer com quais serviços a ferramenta funciona.
+>
+> O servidor **não abre conexões de rede**, não pede login, não guarda senhas ou cookies e
+> **não baixa nem redistribui conteúdo das plataformas** (questões, comentários, aulas). Ele trabalha
+> com **os seus próprios dados de desempenho**: arquivos que você exportou e números que você
+> (ou seu assistente, no seu navegador e na sua sessão) leu das suas páginas de estatísticas.
+> Veja [Uso responsável](#uso-responsável).
 
-Servidor [MCP](https://modelcontextprotocol.io) que transforma seus exports do
-TecConcursos em ferramentas para o Claude (ou qualquer cliente MCP). Com ele, você pode perguntar coisas como:
+Servidor [MCP](https://modelcontextprotocol.io) que transforma seus dados de desempenho em
+ferramentas para o Claude (ou qualquer cliente MCP). Com ele, você pode perguntar coisas como:
 
 - *"Qual minha taxa de acerto por matéria?"*
 - *"Quais assuntos de Direito Penal eu mais erro?"*
@@ -164,11 +170,29 @@ O comando é `uvx --from git+https://github.com/andrevinic/tecconcursos-mcp tecc
 (stdio), com a variável `TEC_EXPORTS_DIR` apontando para a pasta. Se você não definir a variável, a pasta padrão é
 `~/TecConcursos/exports`.
 
+## Uso responsável
+
+Esta ferramenta foi feita para você acompanhar **o seu próprio estudo**. Ao usá-la:
+
+- **Respeite os Termos de Uso de cada plataforma.** Você é responsável por como usa a sua conta. Na dúvida, use só o export oficial e consulte os termos do serviço.
+- **Só os seus dados, na sua sessão.**
+  - Nada aqui contorna login, paywall, captcha ou limite de acesso.
+  - Não use a ferramenta para acessar dados de terceiros nem para coletar o acervo de questões dos sites.
+- **Só números, não conteúdo.**
+  - A coleta do QConcursos guarda contagens de certas/erradas por disciplina e o nome dos assuntos, nunca o texto das questões.
+  - Não publique questões, gabaritos ou comentários das plataformas: são conteúdo protegido por direito autoral.
+- **Volume humano.** Os roteiros leem uma página por vez, com pausa entre elas, e só quando você pede. Não os transforme em robôs agendados contra os sites.
+- **Nada destrutivo.**
+  - Os roteiros proíbem clicar em "zerar" estatísticas.
+  - Os lançamentos na mentoria só acontecem depois da sua confirmação explícita, com os números mostrados antes.
+- **Sem garantia.** As plataformas podem mudar páginas e termos a qualquer momento; a ferramenta pode parar de funcionar ou deixar de ser permitida. O software é fornecido "como está" (licença MIT).
+
 ## Privacidade
 
-Tudo roda na sua máquina. O servidor não abre conexões de rede. O que vai para o modelo é só
-o que as ferramentas devolvem: estatísticas e, em `questoes_erradas`/`buscar_questao`, o texto das
-questões encontradas.
+Tudo roda na sua máquina. O servidor não abre conexões de rede. Seus exports e coletas ficam na pasta de
+exports (fora do repositório; o `.gitignore` também bloqueia `exports/`). O que vai para o modelo é só o que as
+ferramentas devolvem: estatísticas e, em `questoes_erradas`/`buscar_questao`, o texto de questões que estejam
+em arquivos seus. **Nunca faça commit dos seus exports.**
 
 ## Contribuindo
 
@@ -176,7 +200,7 @@ O PDF e os nomes de coluna variam, e é aí que a ajuda mais conta. Se um export
 
 1. Rode `listar_exports` e veja o erro.
 2. Abra uma issue com o **cabeçalho** das colunas, ou um trecho **anonimizado** do PDF.
-   **Não publique questões nem comentários do TecConcursos**: eles são conteúdo protegido.
+   **Não publique questões, comentários nem estatísticas reais das plataformas**: use dados inventados.
 
 Para desenvolver:
 

@@ -1,7 +1,7 @@
 [project]
 name = "tecconcursos-mcp"
 version = "0.3.0"
-description = "Servidor MCP (não oficial) que lê os arquivos exportados do TecConcursos e analisa seu desempenho."
+description = "Servidor MCP não oficial para acompanhar seu próprio desempenho em estudos para concursos (exports do TecConcursos, estatísticas do QConcursos)."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
