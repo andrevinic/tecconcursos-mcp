@@ -56,7 +56,7 @@ Edite o `claude_desktop_config.json`. No Claude Desktop, vá em *Settings → De
   "mcpServers": {
     "tecconcursos": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/SEU-USUARIO/tecconcursos-mcp", "tecconcursos-mcp"],
+      "args": ["--from", "git+https://github.com/andrevinic/tecconcursos-mcp", "tecconcursos-mcp"],
       "env": { "TEC_EXPORTS_DIR": "/Users/voce/TecConcursos/exports" }
     }
   }
@@ -70,12 +70,12 @@ Reinicie o Claude Desktop. As ferramentas aparecem no menu de conectores da conv
 ```bash
 claude mcp add tecconcursos \
   -e TEC_EXPORTS_DIR="$HOME/TecConcursos/exports" \
-  -- uvx --from git+https://github.com/SEU-USUARIO/tecconcursos-mcp tecconcursos-mcp
+  -- uvx --from git+https://github.com/andrevinic/tecconcursos-mcp tecconcursos-mcp
 ```
 
 ### Outros clientes MCP
 
-O comando é `uvx --from git+https://github.com/SEU-USUARIO/tecconcursos-mcp tecconcursos-mcp`
+O comando é `uvx --from git+https://github.com/andrevinic/tecconcursos-mcp tecconcursos-mcp`
 (stdio), com a variável `TEC_EXPORTS_DIR` apontando para a pasta. Se você não definir a variável, a pasta padrão é
 `~/TecConcursos/exports`.
 
@@ -96,7 +96,7 @@ O PDF e os nomes de coluna variam, e é aí que a ajuda mais conta. Se um export
 Para desenvolver:
 
 ```bash
-git clone https://github.com/SEU-USUARIO/tecconcursos-mcp && cd tecconcursos-mcp
+git clone https://github.com/andrevinic/tecconcursos-mcp && cd tecconcursos-mcp
 uv run --extra dev pytest
 ```
 
