@@ -1,0 +1,10 @@
+{
+  "servers": {
+    "tecconcursos": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "git+https://github.com/andrevinic/tecconcursos-mcp", "tecconcursos-mcp"],
+      "env": { "TEC_EXPORTS_DIR": "/CAMINHO/ABSOLUTO/TecConcursos/exports" }
+    }
+  }
+}

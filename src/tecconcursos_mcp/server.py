@@ -307,9 +307,34 @@ def registrar_lancamentos_mentoria(planilha: str, lancamentos: list[dict[str, An
     return mentoria.registrar(bib.pasta, planilha, lancamentos)
 
 
-@mcp.prompt(name="lancar_metas_mentoria", title="Lançar desempenho do TEC nas metas da mentoria")
-def lancar_metas_mentoria() -> str:
-    """Roteiro: ler as metas de hoje, preparar, confirmar com o usuário, preencher e registrar."""
+@mcp.tool(annotations=SOMENTE_LEITURA)
+def preparar_lancamentos_por_assunto(materia: str) -> dict[str, Any]:
+    """Questões de UMA matéria da planilha de Desempenho mais recente, agrupadas pelos assuntos da mentoria.
+
+    `materia`: nome da matéria no TEC ou na mentoria (ex.: "Direito Penal (VTM)", "processual").
+    Cada grupo traz o assunto da mentoria, questões, acertos e os assuntos do TEC que entraram nele;
+    o que não tem par vai para "Assunto Livre". Ajuste pares em mentoria.json → "assuntos".
+    Mostre ao usuário e peça confirmação antes de lançar.
+    """
+    bib = biblioteca()
+    if not bib.pasta.is_dir():
+        return {"erro": f"Pasta não encontrada: {bib.pasta}. Defina TEC_EXPORTS_DIR."}
+    return mentoria.por_assunto(bib.ultimo_snapshot("desempenho"), materia, bib.pasta)
+
+
+@mcp.tool(annotations=SOMENTE_LEITURA)
+def planejar_caderno_semana(metas: list[dict[str, Any]]) -> dict[str, Any]:
+    """Plano do caderno da semana no TecConcursos a partir das metas da mentoria.
+
+    `metas`: [{"data": "2026-11-24", "disciplina": "Direito Penal (VTM)", "assunto": "Aplicação da lei penal",
+    "modalidade": "Exercício", "minutos": 30}], lidas do "Resumo da Semana".
+    Devolve, por meta, os assuntos do TEC a marcar no filtro e quantas questões pegar (pelo tempo da meta),
+    e o total por disciplina. Não acessa nenhum site. Veja o prompt `caderno_da_semana`.
+    """
+    return mentoria.caderno_da_semana(metas, pasta_exports())
+
+
+def _urls_mentoria() -> dict[str, str]:
     url = "a página de Metas Diárias da sua mentoria"
     cfg = pasta_exports() / mentoria.ARQ_MAPA
     if cfg.is_file():
@@ -317,7 +342,22 @@ def lancar_metas_mentoria() -> str:
             url = json.loads(cfg.read_text(encoding="utf-8")).get("url") or url
         except ValueError:
             pass
-    return mentoria.ROTEIRO.format(url=url)
+    base = url.split("/painel/")[0] if "/painel/" in url else None
+    return {"url": url,
+            "url_lancamentos": f"{base}/painel/questoes/lancamento" if base else "Questões → Lançamentos de Questões",
+            "url_semana": f"{base}/painel/semana?periodo=1" if base else "Resumo da Semana"}
+
+
+@mcp.prompt(name="caderno_da_semana", title="Montar no TEC o caderno da semana do plano da mentoria")
+def caderno_da_semana() -> str:
+    """Roteiro: ler o Resumo da Semana da mentoria, planejar e criar o caderno no TecConcursos."""
+    return mentoria.ROTEIRO_CADERNO.format(**_urls_mentoria())
+
+
+@mcp.prompt(name="lancar_metas_mentoria", title="Lançar desempenho do TEC nas metas da mentoria")
+def lancar_metas_mentoria() -> str:
+    """Roteiro: números do dia, lançar por assunto e data, tempo na meta, concluir e registrar."""
+    return mentoria.ROTEIRO.format(**_urls_mentoria())
 
 
 def main() -> None:

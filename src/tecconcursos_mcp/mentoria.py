@@ -25,6 +25,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from . import mapa_assuntos
 from .models import Snapshot, normalizar
 
 ARQ_MAPA = "mentoria.json"
@@ -115,6 +116,90 @@ def preparar(snap: Snapshot | None, metas: list[str], pasta: Path,
             "ignorados": ignorar, "materias_tec_sem_meta_hoje": sem_meta, "avisos": avisos}
 
 
+def ler_assuntos_extra(pasta: Path) -> dict[str, list[str]]:
+    p = pasta / ARQ_MAPA
+    if not p.is_file():
+        return {}
+    return json.loads(p.read_text(encoding="utf-8")).get("assuntos") or {}
+
+
+def _folhas(snap: Snapshot, materia: str):
+    linhas = [l for l in snap.linhas if l.materia == materia and l.nivel >= 1]
+    hs = [l.hierarquia for l in linhas]
+    return [l for l in linhas if not any(h != l.hierarquia and h.startswith(l.hierarquia + ".") for h in hs)]
+
+
+def por_assunto(snap: Snapshot | None, materia: str, pasta: Path) -> dict[str, Any]:
+    """Questões de UMA matéria da planilha agrupadas pelos assuntos da mentoria.
+
+    Use para lançar na página "Lançamentos de Questões" da mentoria (disciplina + assunto + data),
+    em vez de jogar tudo num assunto só.
+    """
+    if snap is None or not snap.tem_acertos:
+        return {"erro": "Nenhuma planilha de Desempenho na pasta."}
+    mats = [l.materia for l in snap.materias()]
+    tec = next((m for m in mats if normalizar(m) == normalizar(materia)), None) or casar(materia, mats, {})
+    if tec is None:
+        return {"erro": f"Matéria '{materia}' não está na planilha. Matérias: {', '.join(mats)}"}
+    extra = ler_assuntos_extra(pasta)
+    grupos: dict[str, dict[str, Any]] = {}
+    for f in _folhas(snap, tec):
+        alvo = mapa_assuntos.assunto_tutory(tec, f.caminho or [f.nome], extra)
+        g = grupos.setdefault(alvo, {"assunto_mentoria": alvo, "questoes": 0, "acertos": 0, "assuntos_tec": []})
+        g["questoes"] += f.resolvidas
+        g["acertos"] += f.acertos or 0
+        g["assuntos_tec"].append(f"{f.nome} ({f.acertos or 0}/{f.resolvidas})")
+    linha = next(l for l in snap.materias() if l.materia == tec)
+    soma = sum(g["questoes"] for g in grupos.values())
+    avisos = []
+    if soma != linha.resolvidas:
+        avisos.append(f"A soma dos assuntos ({soma}) difere do total da matéria ({linha.resolvidas}): "
+                      "alguma questão aparece em mais de um assunto. Ajuste o grupo 'Assunto Livre' para fechar.")
+    lista = sorted(grupos.values(), key=lambda g: (g["assunto_mentoria"] == mapa_assuntos.ASSUNTO_LIVRE,
+                                                   -g["questoes"]))
+    return {"planilha": snap.arquivo, "materia_tec": tec, "total": {"questoes": linha.resolvidas,
+            "acertos": linha.acertos}, "lancar": lista, "avisos": avisos}
+
+
+# Questões por minuto de meta, por modalidade (itens Certo/Errado levam ~1,5 a 2 min com correção).
+_RITMO = {"exercicio": 2.0, "simulado": 2.0, "revisao": 3.0, "estudo": 6.0}
+
+
+def caderno_da_semana(metas: list[dict[str, Any]], pasta: Path) -> dict[str, Any]:
+    """Plano de caderno no TecConcursos a partir das metas da semana na mentoria.
+
+    ``metas``: [{"data", "disciplina", "assunto", "modalidade", "minutos"}], lidas do
+    "Resumo da Semana". Devolve, por meta, os assuntos a marcar no filtro do TEC e quantas questões
+    pegar; e um resumo por disciplina para montar um caderno só (ou um por dia).
+    """
+    extra = ler_assuntos_extra(pasta)
+    itens, sem_mapa = [], []
+    por_disc: dict[str, dict[str, Any]] = {}
+    for m in metas:
+        disc, assunto = m.get("disciplina", ""), m.get("assunto", "")
+        if normalizar(disc).startswith(("revisao geral", "simulado quinzenal")) or not assunto:
+            continue
+        modal = normalizar(m.get("modalidade", ""))
+        ritmo = next((v for k, v in _RITMO.items() if k in modal), 2.5)
+        n = max(5, round(int(m.get("minutos") or 0) / ritmo))
+        termos = [] if normalizar(assunto) == normalizar(mapa_assuntos.ASSUNTO_LIVRE) else \
+            mapa_assuntos.termos_tec(disc, assunto, extra)
+        item = {"data": m.get("data"), "disciplina": disc, "assunto_mentoria": assunto,
+                "modalidade": m.get("modalidade"), "questoes_sugeridas": n, "assuntos_tec": termos}
+        if not termos and normalizar(assunto) != normalizar(mapa_assuntos.ASSUNTO_LIVRE):
+            sem_mapa.append(f"{disc} · {assunto}")
+        itens.append(item)
+        d = por_disc.setdefault(nome_base(disc), {"disciplina": disc, "questoes": 0, "assuntos_tec": []})
+        d["questoes"] += n
+        d["assuntos_tec"] += [t for t in termos if t not in d["assuntos_tec"]]
+    avisos = []
+    if sem_mapa:
+        avisos.append("Sem correspondência no TEC (procure o assunto à mão ou acrescente em mentoria.json → "
+                      "'assuntos'): " + "; ".join(sem_mapa))
+    return {"metas": itens, "caderno": list(por_disc.values()),
+            "total_questoes": sum(d["questoes"] for d in por_disc.values()), "avisos": avisos}
+
+
 def registrar(pasta: Path, arquivo: str, lancamentos: list[dict[str, Any]]) -> dict[str, Any]:
     p = pasta / ARQ_REGISTRO
     registro = ler_registro(pasta)
@@ -128,17 +213,46 @@ def registrar(pasta: Path, arquivo: str, lancamentos: list[dict[str, Any]]) -> d
     return {"registrados": len(novos), "arquivo_registro": str(p)}
 
 
-ROTEIRO = """Lançar o desempenho do TecConcursos nas Metas Diárias da mentoria.
+ROTEIRO = """Lançar o desempenho do TecConcursos na mentoria (Tutory), por assunto e na data certa.
 
-1. Abra a página de metas da mentoria no navegador do usuário ({url}) e leia o título de cada meta
-   de HOJE que ainda NÃO está concluída (ex.: "Simulado de Informática"). Não clique em nada ainda.
-2. Chame `preparar_lancamentos_mentoria` com esses títulos.
-3. Mostre ao usuário uma tabela: meta → matéria do TecConcursos → questões feitas → corretas, mais os
-   ignorados, as matérias sem meta hoje e os avisos. Peça confirmação explícita. Sem um "sim", pare.
-4. Para cada item aprovado, na página: marque "Meta concluída" daquela meta; na janela
-   "Exercitando os Conhecimentos", preencha "Questões feitas" e "Questões corretas" com os valores
-   aprovados e clique em Confirmar. Não lance metas fora da lista nem altere valores.
-   Se a janela não abrir ou pedir outra coisa, pare e pergunte.
-5. Chame `registrar_lancamentos_mentoria` só com os itens efetivamente salvos.
-6. Diga ao usuário o que foi lançado e o que ficou de fora.
+Antes: se a página pedir login, pare e peça ao usuário para entrar (nunca digite a senha).
+
+1. Números do dia. Use a planilha de Desempenho importada OU, para um dia específico, a página do TEC
+   Estatísticas → Desempenho com o período = esse dia (abra cada matéria para ver os assuntos).
+   O período da planilha não vem no arquivo: confira que cobre só o que ainda não foi lançado.
+2. Leia as metas de HOJE na página de metas ({url}) e chame `preparar_lancamentos_mentoria` com os
+   títulos (meta → matéria do TEC). Para cada matéria, chame `preparar_lancamentos_por_assunto`
+   (assuntos do TEC → assuntos da mentoria). Mostre as tabelas ao usuário e peça confirmação
+   explícita. Sem um "sim", pare.
+3. Questões: na página "Lançamentos de Questões" ({url_lancamentos}) cadastre cada linha aprovada
+   (disciplina, assunto, DATA do estudo, feitas, corretas). Depois de cada cadastro a página precisa ser
+   recarregada. Confira a soma por disciplina na tabela "Suas Questões" no fim.
+   Cuidado: a lixeira apaga TODAS as linhas idênticas (mesma data, assunto e números); nunca deixe
+   duplicatas para apagar uma só.
+4. Tempo: na meta do dia correspondente (página de metas, {url}), "Opções de Cronômetro" →
+   "Lançamento Manual" (selects de horas/minutos/segundos). Se não houver meta daquela matéria hoje,
+   use "Estudou algo fora do planejado hoje? Informe aqui" (cai no dia atual do plano) e lance o tempo
+   no cartão criado. O cronômetro dos cadernos do TEC pode ter ficado ligado (ex.: 10h): não use um
+   tempo absurdo; pergunte ou estime pelo ritmo da pessoa e diga que é estimativa.
+5. Conclua a meta marcando "Meta concluída". Se as questões já foram lançadas no passo 3, feche a
+   janela "Exercitando os Conhecimentos" no X e responda "Sim" para não contar em dobro.
+6. Se o plano estiver parado num dia antigo com meta especial não feita (ex.: simulado), não marque
+   como concluída: use "Replanejar atrasos" (o assistente pergunta "posso prosseguir?" → sim).
+7. Chame `registrar_lancamentos_mentoria` com o que foi salvo e diga ao usuário o que entrou,
+   o que ficou de fora e o que foi estimado.
+"""
+
+ROTEIRO_CADERNO = """Montar no TecConcursos o caderno de questões da semana a partir do plano da mentoria.
+
+1. Abra o "Resumo da Semana" da mentoria ({url_semana}) e leia, para cada dia, as metas:
+   disciplina, assunto, modalidade (Estudo, Exercício, Revisão...) e minutos. Pule metas especiais
+   (simulado quinzenal, revisão geral). Se pedir login, peça ao usuário para entrar.
+2. Chame `planejar_caderno_semana` com essas metas. Mostre ao usuário: por disciplina, os assuntos do
+   TEC e quantas questões; e as metas sem correspondência. Peça confirmação.
+3. No TEC: Estudo → Filtrar questões. Selecione as matérias e, na árvore de assuntos, os assuntos
+   listados (busque pelos trechos). Filtros recomendados: questões não resolvidas, bancas do concurso
+   alvo, anos recentes. Se o total passar muito do sugerido, restrinja anos ou bancas.
+4. Crie UM caderno chamado "Semana AAAA-MM-DD · Tutory" (data da segunda-feira) na pasta de estudo
+   da pessoa. Não apague nem altere cadernos existentes.
+5. Diga ao usuário o nome, o link e quantas questões o caderno tem, e quais metas ficaram sem questões.
 """

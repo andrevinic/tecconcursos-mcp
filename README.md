@@ -29,6 +29,15 @@ O site tem export oficial em **Estatísticas**:
 3. Rode `tecconcursos-mcp importar`. O comando procura essas planilhas em `~/Downloads` pelo
    cabeçalho, copia para a pasta de exports como `desempenho_AAAA-MM-DD.xlsx` e pula as repetidas.
 
+### Automático: a planilha que chega por e-mail
+
+O e-mail do TEC ("Sua exportação de estatísticas está pronta") **não traz anexo**: traz um link temporário (o e-mail diz 7 dias, mas na prática expira em poucas horas, então importe logo).
+`tecconcursos-mcp baixar-email <arquivo .eml>` lê o link, baixa a planilha e importa. Exports repetidos
+(mesmas células, mesmo que o arquivo seja outro) são descartados.
+
+No Mac, a regra do Mail em [`extras/mail/ImportarTEC.applescript`](extras/mail/ImportarTEC.applescript) faz isso
+sozinha a cada e-mail do TEC. É o único comando que acessa a rede, e só o link do seu próprio export.
+
 Cada planilha vira um **ponto na sua evolução**. Ela não diz o período que cobre: a data é a do
 download. Para os pontos serem comparáveis, exporte sempre com o **mesmo tipo de período** (ex.: toda
 domingo, "últimos 7 dias"). Se quiser registrar o período, renomeie para
@@ -64,7 +73,7 @@ Na página de Assuntos, uma questão pode contar em **vários assuntos** (o tota
 de questões) e não aparece a disciplina de cada assunto. Use os assuntos para achar pontos fracos, não para
 somar volume.
 
-## Lançar nas Metas Diárias da mentoria (Tutory)
+## Lançar na mentoria (Tutory)
 
 Se sua mentoria usa a plataforma Tutory (página *Metas Diárias*), o Claude pode lançar ali as
 questões que você fez no TecConcursos. O servidor **não acessa a mentoria**: ele só calcula o que
@@ -78,6 +87,32 @@ lançar, e quem preenche é o Claude no seu navegador (ex.: Claude in Chrome), *
    - marcar "Meta concluída" e preencher *Questões feitas* / *Questões corretas*;
    - `registrar_lancamentos_mentoria`.
 3. O que foi lançado fica em `mentoria_lancados.json`. A mesma planilha não é lançada duas vezes.
+
+**Por assunto e na data certa.** `preparar_lancamentos_por_assunto` agrupa as questões de uma matéria pelos
+assuntos da mentoria (ex.: "Legítima Defesa" e "Estrito Cumprimento" do TEC → "Ilicitude e causas de exclusão").
+O lançamento é feito na página *Lançamentos de Questões* da mentoria, que aceita disciplina, assunto e **data**.
+O que não tem par vai para "Assunto Livre". O roteiro também cobre: tempo pelo *Lançamento Manual*, estudo fora
+do plano ("Estudou algo fora do planejado"), concluir a meta sem contar as questões em dobro e "Replanejar
+atrasos" quando o plano trava num dia antigo.
+
+## Caderno da semana (mentoria → TecConcursos)
+
+O prompt **`caderno_da_semana`** lê o *Resumo da Semana* da mentoria e monta **um caderno no TEC** com as
+questões das metas da semana:
+
+1. Para cada meta (disciplina, assunto, modalidade, minutos), `planejar_caderno_semana` devolve os assuntos do
+   TEC a marcar no filtro e quantas questões pegar (exercício ≈ 2 min por item, revisão ≈ 3, estudo ≈ 6).
+2. Você confirma; o Claude filtra as questões no TEC (não resolvidas, bancas e anos do seu concurso) e cria o
+   caderno "Semana AAAA-MM-DD · Tutory".
+
+### Correspondência de assuntos
+
+Os pares mentoria ↔ TEC ficam em [`mapa_assuntos.py`](src/tecconcursos_mcp/mapa_assuntos.py) (Penal, Processo
+Penal, Constitucional e Português). Para acrescentar ou corrigir, use `mentoria.json`:
+
+```json
+{"assuntos": {"Prisão preventiva": ["prisao preventiva", "medidas cautelares"]}}
+```
 
 Opcional, `mentoria.json` na pasta de exports:
 
@@ -101,6 +136,8 @@ Opcional, `mentoria.json` na pasta de exports:
 | `preparar_lancamentos_mentoria` | Para cada meta do dia, a matéria do TEC e as questões/acertos a lançar |
 | `salvar_estatisticas_qconcursos` | Grava as estatísticas de um dia do QConcursos (lidas da página pelo Claude) |
 | `registrar_lancamentos_mentoria` | Anota localmente o que já foi lançado (única ferramenta que escreve, só na pasta de exports) |
+| `preparar_lancamentos_por_assunto` | Questões de uma matéria agrupadas pelos assuntos da mentoria, para lançar por assunto |
+| `planejar_caderno_semana` | A partir das metas da semana da mentoria, os assuntos do TEC e o número de questões do caderno |
 
 **Exports por questão** (CSV/JSON/PDF de caderno):
 
@@ -170,6 +207,11 @@ O comando é `uvx --from git+https://github.com/andrevinic/tecconcursos-mcp tecc
 (stdio), com a variável `TEC_EXPORTS_DIR` apontando para a pasta. Se você não definir a variável, a pasta padrão é
 `~/TecConcursos/exports`.
 
+## Calendário (macOS, opcional)
+
+[`extras/calendario`](extras/calendario) copia as metas da semana para um calendário "Estudos" no iCloud
+(iPhone, Fantastical), via EventKit.
+
 ## Uso responsável
 
 Esta ferramenta foi feita para você acompanhar **o seu próprio estudo**. Ao usá-la:
@@ -189,7 +231,8 @@ Esta ferramenta foi feita para você acompanhar **o seu próprio estudo**. Ao us
 
 ## Privacidade
 
-Tudo roda na sua máquina. O servidor não abre conexões de rede. Seus exports e coletas ficam na pasta de
+Tudo roda na sua máquina. O servidor não abre conexões de rede; só o comando opcional `baixar-email` baixa a
+planilha do link do seu próprio e-mail (e só de endereços de export do TEC). Seus exports e coletas ficam na pasta de
 exports (fora do repositório; o `.gitignore` também bloqueia `exports/`). O que vai para o modelo é só o que as
 ferramentas devolvem: estatísticas e, em `questoes_erradas`/`buscar_questao`, o texto de questões que estejam
 em arquivos seus. **Nunca faça commit dos seus exports.**

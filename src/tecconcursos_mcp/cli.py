@@ -1,8 +1,9 @@
 """Linha de comando.
 
-    tecconcursos-mcp                 # servidor MCP (stdio), como antes
-    tecconcursos-mcp importar        # copia planilhas oficiais de ~/Downloads para a pasta de exports
-    tecconcursos-mcp painel --abrir  # gera um painel HTML com sua evolução
+    tecconcursos-mcp                          # servidor MCP (stdio), como antes
+    tecconcursos-mcp importar                 # copia planilhas oficiais de ~/Downloads para a pasta de exports
+    tecconcursos-mcp baixar-email email.eml   # baixa a planilha do link do e-mail do TEC e importa
+    tecconcursos-mcp painel --abrir           # gera um painel HTML com sua evolução
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import argparse
 import hashlib
 import shutil
 import sys
+import tempfile
 import webbrowser
 from datetime import date
 from pathlib import Path
@@ -19,15 +21,26 @@ from .parsers.estatisticas import eh_planilha_estatisticas, ler_snapshot_xlsx, p
 
 
 def _hash(p: Path) -> str:
-    return hashlib.sha256(p.read_bytes()).hexdigest()
+    """Assinatura do CONTEÚDO das células: o TEC gera um arquivo novo (bytes e nome diferentes)
+    a cada export, mesmo quando os números são os mesmos."""
+    try:
+        import openpyxl
+
+        ws = openpyxl.load_workbook(p, read_only=True).active
+        h = hashlib.sha256()
+        for linha in ws.iter_rows(values_only=True):
+            h.update(repr(linha).encode("utf-8"))
+        return "celulas:" + h.hexdigest()
+    except Exception:
+        return "bytes:" + hashlib.sha256(p.read_bytes()).hexdigest()
 
 
 def importar(origem: Path, destino: Path, mover: bool = False) -> list[tuple[Path, Path | None, str]]:
     """Procura planilhas oficiais (pelo cabeçalho) em ``origem`` e copia para ``destino``
     como ``desempenho_AAAA-MM-DD.xlsx``/``atividades_AAAA-MM-DD.xlsx``.
 
-    A data é a da modificação do arquivo (= quando você exportou). Arquivos idênticos
-    a algum já importado são pulados. Devolve (origem, destino ou None, motivo).
+    A data é a da modificação do arquivo (= quando você exportou). Planilhas com as mesmas
+    células de alguma já importada são puladas. Devolve (origem, destino ou None, motivo).
     """
     destino.mkdir(parents=True, exist_ok=True)
     existentes = {_hash(p) for p in destino.rglob("*.xlsx") if p.is_file()}
@@ -73,6 +86,11 @@ def main(argv: list[str] | None = None) -> None:
                      help=f"pasta de exports (padrão: $TEC_EXPORTS_DIR ou {PASTA_PADRAO})")
     imp.add_argument("--mover", action="store_true", help="move em vez de copiar")
 
+    em = sub.add_parser("baixar-email", help="baixa a planilha do link do e-mail do TEC e importa")
+    em.add_argument("fonte", help="arquivo com o código-fonte do e-mail (.eml), ou - para ler da entrada padrão")
+    em.add_argument("--para", type=Path, default=None,
+                    help=f"pasta de exports (padrão: $TEC_EXPORTS_DIR ou {PASTA_PADRAO})")
+
     pai = sub.add_parser("painel", help="gera um painel HTML com sua evolução")
     pai.add_argument("--saida", type=Path, default=None, help="arquivo HTML (padrão: <exports>/painel.html)")
     pai.add_argument("--abrir", action="store_true", help="abre no navegador")
@@ -94,6 +112,28 @@ def main(argv: list[str] | None = None) -> None:
         if not res:
             print(f"Nenhuma planilha de Estatísticas do TecConcursos em {args.de}.")
         print(f"{len(novas)} nova(s) em {destino}")
+        return
+
+    if args.cmd == "baixar-email":
+        from . import email_tec
+
+        fonte = sys.stdin.buffer.read() if args.fonte == "-" else Path(args.fonte).expanduser().read_bytes()
+        url = email_tec.extrair_link(fonte)
+        if not url:
+            print("sem link de planilha neste e-mail")
+            return
+        destino = (args.para or pasta_exports()).expanduser()
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                arq = email_tec.baixar(url, Path(tmp))
+            except Exception as e:  # link expirado, sem rede ou host inesperado
+                print(f"falha ao baixar: {e}")
+                sys.exit(1)
+            res = importar(Path(tmp), destino)
+        if not res:
+            print(f"{arq.name}: não é uma planilha de Estatísticas do TecConcursos")
+        for _, alvo, motivo in res:
+            print(f"{motivo}: {alvo}" if alvo else f"{motivo} (mesmas células de uma planilha já importada)")
         return
 
     if args.cmd == "painel":
