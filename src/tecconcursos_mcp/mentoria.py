@@ -196,8 +196,21 @@ def caderno_da_semana(metas: list[dict[str, Any]], pasta: Path) -> dict[str, Any
     if sem_mapa:
         avisos.append("Sem correspondência no TEC (procure o assunto à mão ou acrescente em mentoria.json → "
                       "'assuntos'): " + "; ".join(sem_mapa))
-    return {"metas": itens, "caderno": list(por_disc.values()),
+    filtros = ler_filtros_caderno(pasta)
+    if not filtros["bancas"]:
+        avisos.append("Nenhuma banca em mentoria.json → 'caderno' → 'bancas': o caderno usará todas as bancas. "
+                      "Liste as bancas dos seus concursos (ex.: PRF → CEBRASPE, PC-SP → VUNESP).")
+    return {"metas": itens, "caderno": list(por_disc.values()), "filtros": filtros,
             "total_questoes": sum(d["questoes"] for d in por_disc.values()), "avisos": avisos}
+
+
+def ler_filtros_caderno(pasta: Path) -> dict[str, Any]:
+    """Filtros do caderno da semana em mentoria.json → "caderno": bancas dos concursos-alvo e anos recentes."""
+    p = pasta / ARQ_MAPA
+    cfg = json.loads(p.read_text(encoding="utf-8")).get("caderno", {}) if p.is_file() else {}
+    return {"bancas": list(cfg.get("bancas") or []), "anos_recentes": int(cfg.get("anos_recentes") or 6),
+            "remover": list(cfg.get("remover") or ["resolvi", "anuladas", "desatualizadas"]),
+            "pasta_tec": cfg.get("pasta_tec")}
 
 
 def registrar(pasta: Path, arquivo: str, lancamentos: list[dict[str, Any]]) -> dict[str, Any]:
@@ -250,8 +263,9 @@ ROTEIRO_CADERNO = """Montar no TecConcursos o caderno de questões da semana a p
 2. Chame `planejar_caderno_semana` com essas metas. Mostre ao usuário: por disciplina, os assuntos do
    TEC e quantas questões; e as metas sem correspondência. Peça confirmação.
 3. No TEC: Estudo → Filtrar questões. Selecione as matérias e, na árvore de assuntos, os assuntos
-   listados (busque pelos trechos). Filtros recomendados: questões não resolvidas, bancas do concurso
-   alvo, anos recentes. Se o total passar muito do sugerido, restrinja anos ou bancas.
+   listados (busque pelos trechos). Aplique os `filtros` devolvidos: TODAS as bancas listadas (uma por
+   concurso-alvo, não só uma), os últimos `anos_recentes` anos e, em Opções, "Remover as que resolvi",
+   anuladas e desatualizadas. Em "Editar quantidades", ponha o número de questões de cada matéria.
 4. Crie UM caderno chamado "Semana AAAA-MM-DD · Tutory" (data da segunda-feira) na pasta de estudo
    da pessoa. Não apague nem altere cadernos existentes.
 5. Diga ao usuário o nome, o link e quantas questões o caderno tem, e quais metas ficaram sem questões.

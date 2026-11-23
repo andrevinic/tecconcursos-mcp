@@ -111,8 +111,11 @@ Os pares mentoria ↔ TEC ficam em [`mapa_assuntos.py`](src/tecconcursos_mcp/map
 Penal, Constitucional e Português). Para acrescentar ou corrigir, use `mentoria.json`:
 
 ```json
-{"assuntos": {"Prisão preventiva": ["prisao preventiva", "medidas cautelares"]}}
+{"assuntos": {"Prisão preventiva": ["prisao preventiva", "medidas cautelares"]},
+ "caderno": {"bancas": ["CEBRASPE", "VUNESP", "FUMARC"], "anos_recentes": 6}}
 ```
+
+`caderno.bancas` lista as bancas dos seus concursos-alvo (todas entram no mesmo caderno).
 
 Opcional, `mentoria.json` na pasta de exports:
 
