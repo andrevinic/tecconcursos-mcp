@@ -243,6 +243,10 @@ Antes: se a página pedir login, pare e peça ao usuário para entrar (nunca dig
 1. Números do dia. Use a planilha de Desempenho importada OU, para um dia específico, a página do TEC
    Estatísticas → Desempenho com o período = esse dia (abra cada matéria para ver os assuntos).
    O período da planilha não vem no arquivo: confira que cobre só o que ainda não foi lançado.
+   Para saber por assunto só o que foi feito num CADERNO (ex.: as novas de hoje), leia no navegador
+   logado, uma por uma, `/api/cadernos/<id>/questoes/<n>?atualizarCronometro=false` (somente leitura;
+   não muda a posição do caderno): `questao.nomeMateria`, `nomeAssunto` e `correcaoQuestao`
+   (true/false; null = não resolvida). Compare com o que já está lançado no dia antes de lançar.
 2. Leia as metas de HOJE na página de metas ({url}) e chame `preparar_lancamentos_mentoria` com os
    títulos (meta → matéria do TEC). Para cada matéria, chame `preparar_lancamentos_por_assunto`
    (assuntos do TEC → assuntos da mentoria). Mostre as tabelas ao usuário e peça confirmação
