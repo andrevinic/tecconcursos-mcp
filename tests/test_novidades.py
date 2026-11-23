@@ -77,8 +77,9 @@ def test_caderno_da_semana(tmp_path: Path):
 
 
 def test_caderno_filtros_bancas(tmp_path: Path):
-    (tmp_path / mentoria.ARQ_MAPA).write_text('{"caderno": {"bancas": ["CEBRASPE", "VUNESP"]}}', encoding="utf-8")
+    (tmp_path / mentoria.ARQ_MAPA).write_text(
+        '{"caderno": {"cargos": ["Perito Criminal"], "cargos_excluir": ["Federal"]}}', encoding="utf-8")
     r = mentoria.caderno_da_semana([], tmp_path)
-    assert r["filtros"]["bancas"] == ["CEBRASPE", "VUNESP"] and r["filtros"]["anos_recentes"] == 6
+    assert r["filtros"]["cargos"] == ["Perito Criminal"] and r["filtros"]["cargos_excluir"] == ["Federal"]
     assert not r["avisos"]
-    assert "banca" in mentoria.caderno_da_semana([], tmp_path / "vazio")["avisos"][0]
+    assert "Delegado" in mentoria.caderno_da_semana([], tmp_path / "vazio")["avisos"][0]

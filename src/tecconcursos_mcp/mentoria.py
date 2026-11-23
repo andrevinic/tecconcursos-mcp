@@ -197,18 +197,25 @@ def caderno_da_semana(metas: list[dict[str, Any]], pasta: Path) -> dict[str, Any
         avisos.append("Sem correspondência no TEC (procure o assunto à mão ou acrescente em mentoria.json → "
                       "'assuntos'): " + "; ".join(sem_mapa))
     filtros = ler_filtros_caderno(pasta)
-    if not filtros["bancas"]:
-        avisos.append("Nenhuma banca em mentoria.json → 'caderno' → 'bancas': o caderno usará todas as bancas. "
-                      "Liste as bancas dos seus concursos (ex.: PRF → CEBRASPE, PC-SP → VUNESP).")
+    if not filtros["cargos"] and not filtros["bancas"]:
+        avisos.append("Sem 'cargos' nem 'bancas' em mentoria.json → 'caderno': o caderno trará questões de qualquer "
+                      "cargo (inclusive Delegado). Liste os cargos-alvo (ex.: 'Perito Criminal', "
+                      "'Policial Rodoviário Federal').")
     return {"metas": itens, "caderno": list(por_disc.values()), "filtros": filtros,
             "total_questoes": sum(d["questoes"] for d in por_disc.values()), "avisos": avisos}
 
 
 def ler_filtros_caderno(pasta: Path) -> dict[str, Any]:
-    """Filtros do caderno da semana em mentoria.json → "caderno": bancas dos concursos-alvo e anos recentes."""
+    """Filtros do caderno da semana em mentoria.json → "caderno".
+
+    ``cargos``: trechos de cargo do TEC a incluir (ex.: "Perito Criminal" pega todos os estados), o jeito
+    certo de evitar questões de Delegado; ``cargos_excluir``: trechos a tirar (ex.: "Federal", "Auxiliar");
+    ``bancas`` e ``anos_recentes``: opcionais, restringem mais.
+    """
     p = pasta / ARQ_MAPA
     cfg = json.loads(p.read_text(encoding="utf-8")).get("caderno", {}) if p.is_file() else {}
-    return {"bancas": list(cfg.get("bancas") or []), "anos_recentes": int(cfg.get("anos_recentes") or 6),
+    return {"cargos": list(cfg.get("cargos") or []), "cargos_excluir": list(cfg.get("cargos_excluir") or []),
+            "bancas": list(cfg.get("bancas") or []), "anos_recentes": cfg.get("anos_recentes"),
             "remover": list(cfg.get("remover") or ["resolvi", "anuladas", "desatualizadas"]),
             "pasta_tec": cfg.get("pasta_tec")}
 
@@ -263,9 +270,13 @@ ROTEIRO_CADERNO = """Montar no TecConcursos o caderno de questões da semana a p
 2. Chame `planejar_caderno_semana` com essas metas. Mostre ao usuário: por disciplina, os assuntos do
    TEC e quantas questões; e as metas sem correspondência. Peça confirmação.
 3. No TEC: Estudo → Filtrar questões. Selecione as matérias e, na árvore de assuntos, os assuntos
-   listados (busque pelos trechos). Aplique os `filtros` devolvidos: TODAS as bancas listadas (uma por
-   concurso-alvo, não só uma), os últimos `anos_recentes` anos e, em Opções, "Remover as que resolvi",
-   anuladas e desatualizadas. Em "Editar quantidades", ponha o número de questões de cada matéria.
+   listados (busque pelos trechos). Aplique os `filtros` devolvidos:
+   - "Órgão e cargo": cada cargo cujo nome contém um trecho de `cargos` e nenhum de `cargos_excluir`.
+     Cargos com áreas são pastas: abra e marque "Todo o conteúdo de ...". Clicar de novo num item
+     já ativo o DESMARCA; confira "Filtros ativos" depois de cada clique.
+   - `bancas` e `anos_recentes`, só se vierem preenchidos.
+   - Opções: "Remover as que resolvi", anuladas e desatualizadas.
+   Em "Editar quantidades", ponha o número de questões de cada matéria (ou o máximo disponível).
 4. Crie UM caderno chamado "Semana AAAA-MM-DD · Tutory" (data da segunda-feira) na pasta de estudo
    da pessoa. Não apague nem altere cadernos existentes.
 5. Diga ao usuário o nome, o link e quantas questões o caderno tem, e quais metas ficaram sem questões.

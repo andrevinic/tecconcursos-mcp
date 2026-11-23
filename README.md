@@ -112,10 +112,12 @@ Penal, Constitucional e Português). Para acrescentar ou corrigir, use `mentoria
 
 ```json
 {"assuntos": {"Prisão preventiva": ["prisao preventiva", "medidas cautelares"]},
- "caderno": {"bancas": ["CEBRASPE", "VUNESP", "FUMARC"], "anos_recentes": 6}}
+ "caderno": {"cargos": ["Perito Criminal", "Perito Oficial", "Policial Rodoviário Federal"],
+             "cargos_excluir": ["Federal", "Auxiliar"]}}
 ```
 
-`caderno.bancas` lista as bancas dos seus concursos-alvo (todas entram no mesmo caderno).
+`caderno.cargos` filtra pelas provas dos cargos-alvo, o que evita questões de Delegado e de outras carreiras.
+`bancas` e `anos_recentes` são opcionais.
 
 Opcional, `mentoria.json` na pasta de exports:
 
