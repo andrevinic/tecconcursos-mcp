@@ -70,10 +70,10 @@ def test_caderno_da_semana(tmp_path: Path):
          "modalidade": "Revisão", "minutos": 30},
     ]
     r = mentoria.caderno_da_semana(metas, tmp_path)
-    assert [m["questoes_sugeridas"] for m in r["metas"]] == [15, 10, 10]
+    assert [m["questoes_sugeridas"] for m in r["metas"]] == [15, 10, 0]
     assert r["metas"][1]["assuntos_tec"] == ["inquerito policial"]
     assert "Assunto inventado" in r["avisos"][0]
-    assert r["total_questoes"] == 35
+    assert r["total_questoes"] == 25
 
 
 def test_caderno_filtros_bancas(tmp_path: Path):

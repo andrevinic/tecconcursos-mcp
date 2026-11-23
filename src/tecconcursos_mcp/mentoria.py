@@ -189,6 +189,9 @@ def caderno_da_semana(metas: list[dict[str, Any]], pasta: Path) -> dict[str, Any
         if not termos and normalizar(assunto) != normalizar(mapa_assuntos.ASSUNTO_LIVRE):
             sem_mapa.append(f"{disc} · {assunto}")
         itens.append(item)
+        if not termos:  # sem assunto do TEC para filtrar: fica fora do caderno
+            item["questoes_sugeridas"] = 0
+            continue
         d = por_disc.setdefault(nome_base(disc), {"disciplina": disc, "questoes": 0, "assuntos_tec": []})
         d["questoes"] += n
         d["assuntos_tec"] += [t for t in termos if t not in d["assuntos_tec"]]
